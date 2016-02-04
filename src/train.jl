@@ -18,6 +18,7 @@ type Inputs
     movie_names::FileSpec
     ratings::FileSpec
     R::Nullable{SparseMatrixCSC{Float64,Int64}}
+    testdata::Nullable{SparseMatrixCSC{Float64,Int64}}
     M::Nullable{Matrix}
 
     function Inputs(movie_names::FileSpec, ratings::FileSpec)
@@ -25,24 +26,43 @@ type Inputs
     end
 end
 
-function prepdata(R)
-    
+function prepdata(A)
+    # Split the test and training
+
+    n = 1000
+
+    # separate the columns and make them of appropriate types
+    users   = convert(Vector{Int},     A[:,1])
+    movies  = convert(Vector{Int},     A[:,2])
+    ratings = convert(Vector{Float64}, A[:,3])
+
+    ind = randcycle(length(users))
+
+    testusers = users[ind[1:n]]
+    testmovies = movies[ind[1:n]]
+    testratings = ratings[ind[1:n]]
+    testdata = sparse(testusers, testmovies, testratings)
+
+    delind = sort(ind[1:n])
+    deleteat!(users, delind)
+    deleteat!(movies, delind)
+    deleteat!(ratings, delind)
+
+    # create a sparse matrix
+    traindata = sparse(users, movies, ratings)
+
+    return traindata, testdata
+
 end
 
 function ratings(inp::Inputs)
     if isnull(inp.R)
         A = read_input(inp.ratings)
+        traindata, testdata = prepdata(A)
 
-        # separate the columns and make them of appropriate types
-        users   = convert(Vector{Int},     A[:,1])
-        movies  = convert(Vector{Int},     A[:,2])
-        ratings = convert(Vector{Float64}, A[:,3])
-
-        # create a sparse matrix
-        R = sparse(users, movies, ratings)
-        #train, test = prepdata(R)
         #R = filter_empty(R)
-        inp.R = Nullable(R)
+        inp.R = Nullable(traindata)
+        inp.testdata = Nullable(testdata)
     end
 
     get(inp.R)
